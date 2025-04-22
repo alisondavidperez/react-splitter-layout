@@ -1,9 +1,7 @@
-import { JSDOM } from 'jsdom';
+// Import jest-dom
+import '@testing-library/jest-dom';
 
-const jsdom = new JSDOM('<!doctype html><html><body></body></html>');
-global.window = jsdom.window;
-global.document = window.document;
-
+// Simulate mouse and touch events on document
 document.simulateMouseUp = () => {
   document.dispatchEvent(new MouseEvent('mouseup'));
 };
@@ -20,6 +18,7 @@ document.simulateTouchMove = (clientX, clientY) => {
   document.dispatchEvent(new TouchEvent('touchmove', { changedTouches: [{ clientX, clientY }] }));
 };
 
+// Simulate window resize
 window.resizeTo = (width, height) => {
   window.innerWidth = width;
   window.innerHeight = height;
