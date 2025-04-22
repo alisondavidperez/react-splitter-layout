@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import PropTypes from 'prop-types';
 import Pane from './Pane';
 
@@ -22,75 +22,35 @@ function clearSelection() {
 
 const DEFAULT_SPLITTER_SIZE = 4;
 
-class SplitterLayout extends React.Component {
-  constructor(props) {
-    super(props);
-    this.handleResize = this.handleResize.bind(this);
-    this.handleMouseMove = this.handleMouseMove.bind(this);
-    this.handleMouseUp = this.handleMouseUp.bind(this);
-    this.handleTouchMove = this.handleTouchMove.bind(this);
-    this.handleSplitterMouseDown = this.handleSplitterMouseDown.bind(this);
-    this.state = {
-      secondaryPaneSize: 0,
-      resizing: false
-    };
-  }
+function SplitterLayout({
+  customClassName = '',
+  vertical = false,
+  percentage = false,
+  primaryIndex = 0,
+  primaryMinSize = 0,
+  secondaryInitialSize,
+  secondaryMinSize = 0,
+  onDragStart,
+  onDragEnd,
+  onSecondaryPaneSizeChange,
+  children = []
+}) {
+  const [secondaryPaneSize, setSecondaryPaneSize] = useState(0);
+  const [resizing, setResizing] = useState(false);
+  const containerRef = useRef(null);
+  const splitterRef = useRef(null);
+  const prevResizingRef = useRef(resizing);
+  const prevSecondaryPaneSizeRef = useRef(secondaryPaneSize);
+  
+  // Normalize primaryIndex to be either 0 or 1
+  const normalizedPrimaryIndex = (primaryIndex !== 0 && primaryIndex !== 1) ? 0 : primaryIndex;
 
-  componentDidMount() {
-    window.addEventListener('resize', this.handleResize);
-    document.addEventListener('mouseup', this.handleMouseUp);
-    document.addEventListener('mousemove', this.handleMouseMove);
-    document.addEventListener('touchend', this.handleMouseUp);
-    document.addEventListener('touchmove', this.handleTouchMove);
-
-    let secondaryPaneSize;
-    if (typeof this.props.secondaryInitialSize !== 'undefined') {
-      secondaryPaneSize = this.props.secondaryInitialSize;
-    } else {
-      const containerRect = this.container.getBoundingClientRect();
-      let splitterRect;
-      if (this.splitter) {
-        splitterRect = this.splitter.getBoundingClientRect();
-      } else {
-        // Simulate a splitter
-        splitterRect = { width: DEFAULT_SPLITTER_SIZE, height: DEFAULT_SPLITTER_SIZE };
-      }
-      secondaryPaneSize = this.getSecondaryPaneSize(containerRect, splitterRect, {
-        left: containerRect.left + ((containerRect.width - splitterRect.width) / 2),
-        top: containerRect.top + ((containerRect.height - splitterRect.height) / 2)
-      }, false);
-    }
-    this.setState({ secondaryPaneSize });
-  }
-
-  componentDidUpdate(prevProps, prevState) {
-    if (prevState.secondaryPaneSize !== this.state.secondaryPaneSize && this.props.onSecondaryPaneSizeChange) {
-      this.props.onSecondaryPaneSizeChange(this.state.secondaryPaneSize);
-    }
-    if (prevState.resizing !== this.state.resizing) {
-      if (this.state.resizing) {
-        if (this.props.onDragStart) {
-          this.props.onDragStart();
-        }
-      } else if (this.props.onDragEnd) {
-        this.props.onDragEnd();
-      }
-    }
-  }
-
-  componentWillUnmount() {
-    window.removeEventListener('resize', this.handleResize);
-    document.removeEventListener('mouseup', this.handleMouseUp);
-    document.removeEventListener('mousemove', this.handleMouseMove);
-    document.removeEventListener('touchend', this.handleMouseUp);
-    document.removeEventListener('touchmove', this.handleTouchMove);
-  }
-
-  getSecondaryPaneSize(containerRect, splitterRect, clientPosition, offsetMouse) {
+  const getSecondaryPaneSize = useCallback((containerRect, splitterRect, clientPosition, offsetMouse) => {
     let totalSize;
     let splitterSize;
     let offset;
-    if (this.props.vertical) {
+    
+    if (vertical) {
       totalSize = containerRect.height;
       splitterSize = splitterRect.height;
       offset = clientPosition.top - containerRect.top;
@@ -99,126 +59,211 @@ class SplitterLayout extends React.Component {
       splitterSize = splitterRect.width;
       offset = clientPosition.left - containerRect.left;
     }
+    
     if (offsetMouse) {
       offset -= splitterSize / 2;
     }
+    
     if (offset < 0) {
       offset = 0;
     } else if (offset > totalSize - splitterSize) {
       offset = totalSize - splitterSize;
     }
 
-    let secondaryPaneSize;
-    if (this.props.primaryIndex === 1) {
-      secondaryPaneSize = offset;
+    let calculatedSecondaryPaneSize;
+    if (normalizedPrimaryIndex === 1) {
+      calculatedSecondaryPaneSize = offset;
     } else {
-      secondaryPaneSize = totalSize - splitterSize - offset;
+      calculatedSecondaryPaneSize = totalSize - splitterSize - offset;
     }
-    let primaryPaneSize = totalSize - splitterSize - secondaryPaneSize;
-    if (this.props.percentage) {
-      secondaryPaneSize = (secondaryPaneSize * 100) / totalSize;
+    
+    let primaryPaneSize = totalSize - splitterSize - calculatedSecondaryPaneSize;
+    
+    if (percentage) {
+      calculatedSecondaryPaneSize = (calculatedSecondaryPaneSize * 100) / totalSize;
       primaryPaneSize = (primaryPaneSize * 100) / totalSize;
       splitterSize = (splitterSize * 100) / totalSize;
       totalSize = 100;
     }
 
-    if (primaryPaneSize < this.props.primaryMinSize) {
-      secondaryPaneSize = Math.max(secondaryPaneSize - (this.props.primaryMinSize - primaryPaneSize), 0);
-    } else if (secondaryPaneSize < this.props.secondaryMinSize) {
-      secondaryPaneSize = Math.min(totalSize - splitterSize - this.props.primaryMinSize, this.props.secondaryMinSize);
-    }
-
-    return secondaryPaneSize;
-  }
-
-  handleResize() {
-    if (this.splitter && !this.props.percentage) {
-      const containerRect = this.container.getBoundingClientRect();
-      const splitterRect = this.splitter.getBoundingClientRect();
-      const secondaryPaneSize = this.getSecondaryPaneSize(containerRect, splitterRect, {
-        left: splitterRect.left,
-        top: splitterRect.top
-      }, false);
-      this.setState({ secondaryPaneSize });
-    }
-  }
-
-  handleMouseMove(e) {
-    if (this.state.resizing) {
-      const containerRect = this.container.getBoundingClientRect();
-      const splitterRect = this.splitter.getBoundingClientRect();
-      const secondaryPaneSize = this.getSecondaryPaneSize(containerRect, splitterRect, {
-        left: e.clientX,
-        top: e.clientY
-      }, true);
-      clearSelection();
-      this.setState({ secondaryPaneSize });
-    }
-  }
-
-  handleTouchMove(e) {
-    this.handleMouseMove(e.changedTouches[0]);
-  }
-
-  handleSplitterMouseDown() {
-    clearSelection();
-    this.setState({ resizing: true });
-  }
-
-  handleMouseUp() {
-    this.setState(prevState => (prevState.resizing ? { resizing: false } : null));
-  }
-
-  render() {
-    let containerClasses = 'splitter-layout';
-    if (this.props.customClassName) {
-      containerClasses += ` ${this.props.customClassName}`;
-    }
-    if (this.props.vertical) {
-      containerClasses += ' splitter-layout-vertical';
-    }
-    if (this.state.resizing) {
-      containerClasses += ' layout-changing';
-    }
-
-    const children = React.Children.toArray(this.props.children).slice(0, 2);
-    if (children.length === 0) {
-      children.push(<div />);
-    }
-    const wrappedChildren = [];
-    const primaryIndex = (this.props.primaryIndex !== 0 && this.props.primaryIndex !== 1) ? 0 : this.props.primaryIndex;
-    for (let i = 0; i < children.length; ++i) {
-      let primary = true;
-      let size = null;
-      if (children.length > 1 && i !== primaryIndex) {
-        primary = false;
-        size = this.state.secondaryPaneSize;
-      }
-      wrappedChildren.push(
-        <Pane vertical={this.props.vertical} percentage={this.props.percentage} primary={primary} size={size}>
-          {children[i]}
-        </Pane>
+    if (primaryPaneSize < primaryMinSize) {
+      calculatedSecondaryPaneSize = Math.max(calculatedSecondaryPaneSize - (primaryMinSize - primaryPaneSize), 0);
+    } else if (calculatedSecondaryPaneSize < secondaryMinSize) {
+      calculatedSecondaryPaneSize = Math.min(
+        totalSize - splitterSize - primaryMinSize, 
+        secondaryMinSize
       );
     }
 
-    return (
-      <div className={containerClasses} ref={(c) => { this.container = c; }}>
-        {wrappedChildren[0]}
-        {wrappedChildren.length > 1 &&
-          (
-            <div
-              role="separator"
-              className="layout-splitter"
-              ref={(c) => { this.splitter = c; }}
-              onMouseDown={this.handleSplitterMouseDown}
-              onTouchStart={this.handleSplitterMouseDown}
-            />
-          )
-        }
-        {wrappedChildren.length > 1 && wrappedChildren[1]}
-      </div>
+    return calculatedSecondaryPaneSize;
+  }, [vertical, percentage, normalizedPrimaryIndex, primaryMinSize, secondaryMinSize]);
+
+  const handleResize = useCallback(() => {
+    if (splitterRef.current && !percentage) {
+      const containerRect = containerRef.current.getBoundingClientRect();
+      const splitterRect = splitterRef.current.getBoundingClientRect();
+      const newSecondaryPaneSize = getSecondaryPaneSize(
+        containerRect, 
+        splitterRect, 
+        {
+          left: splitterRect.left,
+          top: splitterRect.top
+        }, 
+        false
+      );
+      setSecondaryPaneSize(newSecondaryPaneSize);
+    }
+  }, [getSecondaryPaneSize, percentage]);
+
+  const handleMouseMove = useCallback((e) => {
+    if (resizing) {
+      const containerRect = containerRef.current.getBoundingClientRect();
+      const splitterRect = splitterRef.current.getBoundingClientRect();
+      const newSecondaryPaneSize = getSecondaryPaneSize(
+        containerRect, 
+        splitterRect, 
+        {
+          left: e.clientX,
+          top: e.clientY
+        }, 
+        true
+      );
+      clearSelection();
+      setSecondaryPaneSize(newSecondaryPaneSize);
+    }
+  }, [resizing, getSecondaryPaneSize]);
+
+  const handleTouchMove = useCallback((e) => {
+    handleMouseMove(e.changedTouches[0]);
+  }, [handleMouseMove]);
+
+  const handleSplitterMouseDown = useCallback(() => {
+    clearSelection();
+    setResizing(true);
+  }, []);
+
+  const handleMouseUp = useCallback(() => {
+    if (resizing) {
+      setResizing(false);
+    }
+  }, [resizing]);
+
+  // Initialize secondaryPaneSize
+  useEffect(() => {
+    if (typeof secondaryInitialSize !== 'undefined') {
+      setSecondaryPaneSize(secondaryInitialSize);
+    } else if (containerRef.current) {
+      const containerRect = containerRef.current.getBoundingClientRect();
+      let splitterRect;
+      
+      if (splitterRef.current) {
+        splitterRect = splitterRef.current.getBoundingClientRect();
+      } else {
+        // Simulate a splitter
+        splitterRect = { width: DEFAULT_SPLITTER_SIZE, height: DEFAULT_SPLITTER_SIZE };
+      }
+      
+      const initialSecondaryPaneSize = getSecondaryPaneSize(
+        containerRect, 
+        splitterRect, 
+        {
+          left: containerRect.left + ((containerRect.width - splitterRect.width) / 2),
+          top: containerRect.top + ((containerRect.height - splitterRect.height) / 2)
+        }, 
+        false
+      );
+      
+      setSecondaryPaneSize(initialSecondaryPaneSize);
+    }
+  }, [secondaryInitialSize, getSecondaryPaneSize]);
+
+  // Add and remove event listeners
+  useEffect(() => {
+    window.addEventListener('resize', handleResize);
+    document.addEventListener('mouseup', handleMouseUp);
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('touchend', handleMouseUp);
+    document.addEventListener('touchmove', handleTouchMove);
+    
+    return () => {
+      window.removeEventListener('resize', handleResize);
+      document.removeEventListener('mouseup', handleMouseUp);
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('touchend', handleMouseUp);
+      document.removeEventListener('touchmove', handleTouchMove);
+    };
+  }, [handleResize, handleMouseUp, handleMouseMove, handleTouchMove]);
+
+  // Handle callbacks when secondaryPaneSize or resizing state changes
+  useEffect(() => {
+    if (prevSecondaryPaneSizeRef.current !== secondaryPaneSize && onSecondaryPaneSizeChange) {
+      onSecondaryPaneSizeChange(secondaryPaneSize);
+    }
+    prevSecondaryPaneSizeRef.current = secondaryPaneSize;
+
+    if (prevResizingRef.current !== resizing) {
+      if (resizing) {
+        onDragStart?.();
+      } else {
+        onDragEnd?.();
+      }
+    }
+    prevResizingRef.current = resizing;
+  }, [secondaryPaneSize, resizing, onDragStart, onDragEnd, onSecondaryPaneSizeChange]);
+
+  // Rendering logic
+  let containerClasses = 'splitter-layout';
+  if (customClassName) {
+    containerClasses += ` ${customClassName}`;
+  }
+  if (vertical) {
+    containerClasses += ' splitter-layout-vertical';
+  }
+  if (resizing) {
+    containerClasses += ' layout-changing';
+  }
+
+  const childrenArray = React.Children.toArray(children).slice(0, 2);
+  if (childrenArray.length === 0) {
+    childrenArray.push(<div />);
+  }
+  
+  const wrappedChildren = [];
+  for (let i = 0; i < childrenArray.length; ++i) {
+    let primary = true;
+    let size = null;
+    if (childrenArray.length > 1 && i !== normalizedPrimaryIndex) {
+      primary = false;
+      size = secondaryPaneSize;
+    }
+    wrappedChildren.push(
+      <Pane 
+        key={i}
+        vertical={vertical} 
+        percentage={percentage} 
+        primary={primary} 
+        size={size}
+      >
+        {childrenArray[i]}
+      </Pane>
     );
   }
+
+  return (
+    <div className={containerClasses} ref={containerRef}>
+      {wrappedChildren[0]}
+      {wrappedChildren.length > 1 && (
+        <div
+          role="separator"
+          className="layout-splitter"
+          ref={splitterRef}
+          onMouseDown={handleSplitterMouseDown}
+          onTouchStart={handleSplitterMouseDown}
+        />
+      )}
+      {wrappedChildren.length > 1 && wrappedChildren[1]}
+    </div>
+  );
 }
 
 SplitterLayout.propTypes = {
@@ -233,20 +278,6 @@ SplitterLayout.propTypes = {
   onDragEnd: PropTypes.func,
   onSecondaryPaneSizeChange: PropTypes.func,
   children: PropTypes.arrayOf(PropTypes.node)
-};
-
-SplitterLayout.defaultProps = {
-  customClassName: '',
-  vertical: false,
-  percentage: false,
-  primaryIndex: 0,
-  primaryMinSize: 0,
-  secondaryInitialSize: undefined,
-  secondaryMinSize: 0,
-  onDragStart: null,
-  onDragEnd: null,
-  onSecondaryPaneSizeChange: null,
-  children: []
 };
 
 export default SplitterLayout;

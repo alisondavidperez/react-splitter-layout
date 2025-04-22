@@ -1,5 +1,4 @@
 const { resolve } = require('path');
-const webpack = require('webpack');
 const CopyWebpackPlugin = require('copy-webpack-plugin');
 
 module.exports = {
@@ -8,7 +7,12 @@ module.exports = {
     './index.js'
   ],
   resolve: {
-    extensions: ['.js', '.jsx']
+    extensions: ['.js', '.jsx'],
+    fallback: {
+      crypto: false,
+      stream: false,
+      buffer: false
+    }
   },
   module: {
     rules: [
@@ -20,18 +24,23 @@ module.exports = {
     ]
   },
   plugins: [
-    new CopyWebpackPlugin([
-      {
-        from: 'src/stylesheets/*',
-        flatten: true
-      }
-    ])
+    new CopyWebpackPlugin({
+      patterns: [
+        { 
+          from: 'src/stylesheets/*', 
+          to: '[name].[ext]'
+        }
+      ]
+    })
   ],
   output: {
     path: resolve(__dirname, 'lib'),
     filename: 'index.js',
-    library: 'react-splitter-layout',
-    libraryTarget: 'umd'
+    library: {
+      name: 'react-splitter-layout',
+      type: 'umd'
+    },
+    globalObject: 'this'
   },
   externals: {
     react: 'react',

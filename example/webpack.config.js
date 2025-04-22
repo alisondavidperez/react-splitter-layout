@@ -1,12 +1,18 @@
+const path = require('path');
 const webpack = require('webpack');
 
 module.exports = {
-  mode: 'production',
+  mode: 'development',
   entry: [
     './javascripts/index.jsx'
   ],
   resolve: {
-    extensions: ['.js', '.jsx', '.css']
+    extensions: ['.js', '.jsx', '.css'],
+    fallback: {
+      crypto: false,
+      stream: false,
+      buffer: false
+    }
   },
   module: {
     rules: [
@@ -24,7 +30,8 @@ module.exports = {
             }
           }
         ]
-      }, {
+      }, 
+      {
         test: /\.css$/,
         use: [
           'style-loader',
@@ -34,7 +41,14 @@ module.exports = {
     ]
   },
   output: {
-    path: __dirname,
+    path: path.resolve(__dirname),
     filename: 'bundle.js'
+  },
+  devServer: {
+    static: {
+      directory: __dirname,
+    },
+    hot: true,
+    port: 8081
   }
 };

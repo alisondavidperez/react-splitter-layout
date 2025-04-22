@@ -18,7 +18,7 @@ React-splitter-layout depends on React and prop-types. See [package.json](packag
 ## Installation
 
 ```sh
-$ npm install --save react-splitter-layout
+$ npm i react-splitter-layout-updated
 ```
 
 ## Testing
@@ -43,7 +43,7 @@ $ npm run coverage
 
 ## Integration
 
-1. Add `react-splitter-layout` dependency to your code.
+1. Add `react-splitter-layout-updated` dependency to your code.
 
     ```sh
     $ npm install --save react-splitter-layout
@@ -53,8 +53,8 @@ $ npm run coverage
 
     ```javascript
     import React from 'react';
-    import SplitterLayout from 'react-splitter-layout';
-    import 'react-splitter-layout/lib/index.css';
+    import SplitterLayout from 'react-splitter-layout-updated';
+    import 'react-splitter-layout-updated/lib/index.css';
 
     class YourComponent extends React.Component {
       render() {
@@ -145,7 +145,10 @@ The `SplitterLayout` component supports the following props.
     When `percentage` is set to `true`, the value is in percentage.
 
 ## Release History
-
+* 5.0.0
+  * Migrated SplitterLayout from class component to function component.
+  * Updated webpack from 4 to 5.
+  * Updated all dependencies.
 * 4.0.0
   * Stylesheets are no longer integrated by default. It has to be handled in your favorite way explicitly.
 * 3.0.0
